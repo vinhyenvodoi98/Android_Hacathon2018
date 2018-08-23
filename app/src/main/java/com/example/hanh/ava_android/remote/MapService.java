@@ -16,5 +16,4 @@ public interface MapService {
     Call<Map> createMap(@Header("Content-Type") String contentType,
                         @Body java.util.Map local);
 
-
 }

@@ -46,7 +46,7 @@
 
 
         <meta-data android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyAeQkm3NzgtvVqxczlQRFl-AtPISm62mXg"/>
+            android:value="AIzaSyBX83rKFvMeIBiIpgl_rpjcnUUJSI0UkgI"/>
     </application>
 
 </manifest>
