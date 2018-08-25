@@ -35,11 +35,13 @@ import android.widget.AdapterView.OnItemClickListener;
 import android.widget.Toast;
 import com.example.hanh.ava_android.BuildConfig;
 
+import com.example.hanh.ava_android.adapter.CustomInfoWindowAdapter;
 import com.example.hanh.ava_android.adapter.PlaceAutocompleteAdapter;
 import com.example.hanh.ava_android.androidbase.BaseActivity;
 import com.example.hanh.ava_android.model.AnswerInsrtuct;
 import com.example.hanh.ava_android.model.EndLocation;
 import com.example.hanh.ava_android.model.Instruct;
+import com.example.hanh.ava_android.model.Jam;
 import com.example.hanh.ava_android.model.Local;
 import com.example.hanh.ava_android.model.PlaceInfo;
 import com.example.hanh.ava_android.model.StartLocation;
@@ -109,6 +111,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private PlaceInfo placeInfo;
     private Instruct instruct;
     private List<Step> stepList;
+    private List<Jam> jamList;
+    private Jam jam;
     private  Step step;
     private Double startLat;
     private Double startLng;
@@ -404,6 +408,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private void getListStep(Instruct instruct) {
         ArrayList<LatLng> listGeopoints = new ArrayList<LatLng>();
+        ArrayList<LatLng> listGeoJams = new ArrayList<LatLng>();
+
         stepList = instruct.getStep();
         step = new Step();
         for (int i = 0; i < stepList.size() ; i++) {
@@ -416,6 +422,28 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             listGeopoints.add(new LatLng(endLat, endLng));
         }
         drawPoints(listGeopoints);
+
+        jamList = instruct.getJams();
+        jam = new Jam();
+        for (int i = 0; i < jamList.size() ; i++) {
+            jam = jamList.get(i);
+            startLat = jam.getStartLocation().getLat();
+            startLng = jam.getStartLocation().getLng();
+            endLat = jam.getEndLocation().getLat();
+            endLng = jam.getEndLocation().getLng();
+            listGeoJams.add(new LatLng(startLat, startLng));
+            listGeoJams.add(new LatLng(endLat, endLng));
+        }
+        drawPointsJam(listGeoJams);
+    }
+
+    private void drawPointsJam(ArrayList<LatLng> listGeoJams) {
+        PolylineOptions rectLine = new PolylineOptions().width(10).color(getResources()
+                .getColor(R.color.colorJam));
+        for (int i = 0; i < listGeoJams.size(); i++) {
+            rectLine.add(listGeoJams.get(i));
+        }
+        Polyline polylin = map.addPolyline(rectLine);
     }
 
 
@@ -552,8 +580,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
     }
 
-    private void moveCamera(LatLng latLng, float zoom, String title) {
-        map.clear();
+    private void moveCamera(LatLng latLng, float zoom, final String title) {
         Log.d(TAG, "moveCamera: moving camera to: lat: " + latLng.latitude + ", lng: " + latLng.longitude);
         map.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, zoom));
 
@@ -561,6 +588,14 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 .position(latLng)
                 .title(title);
         marker = map.addMarker(options);
+        map.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
+            @Override
+            public boolean onMarkerClick(Marker marker) {
+                marker.setTitle(title);
+                return  false;
+            }
+        });
+
         BaseActivity.hideSoftKeyboard(this);
     }
 
@@ -571,6 +606,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         map.clear();
 
+        map.setInfoWindowAdapter(new CustomInfoWindowAdapter(MainActivity.this));
         if (placeInfo != null) {
             String snippet = "Address: " + placeInfo.getAddress() + "\n"
                     + "Phone number: " + placeInfo.getPhoneNumber() + "\n"

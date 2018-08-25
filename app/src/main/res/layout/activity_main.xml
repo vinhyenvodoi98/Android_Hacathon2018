@@ -71,6 +71,7 @@
         android:layout_width="35dp"
         android:layout_height="50dp"
         android:src="@drawable/ic_location_detail"
+        android:layout_below="@+id/cardSearch"
         android:layout_marginStart="10dp"
         android:layout_marginTop="18dp" />
     <ImageView

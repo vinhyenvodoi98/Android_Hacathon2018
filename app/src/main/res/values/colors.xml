@@ -8,4 +8,6 @@
     <color name="colorTextDirection">#ade21a</color>
     <color name="black">#FF000000</color>
     <color name="colorDirection">#31b3ef</color>
+    <color name="colorJam">#ef5131</color>
+
 </resources>
