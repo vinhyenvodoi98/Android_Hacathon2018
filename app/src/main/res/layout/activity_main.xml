@@ -46,7 +46,7 @@
                 android:layout_height="match_parent"
                 android:layout_gravity="center_vertical"
                 android:layout_marginEnd="20dp"
-                android:fontFamily="@font/lato_italic"
+                android:fontFamily="@font/lato_regular"
                 android:hint="@string/edtplace"
                 android:imeOptions="actionDone"
                 android:maxLines="1"
@@ -68,12 +68,19 @@
 
     <ImageView
         android:id="@+id/imgShowDetail"
-        android:layout_width="30dp"
+        android:layout_width="35dp"
         android:layout_height="50dp"
-        android:layout_below="@+id/cardSearch"
         android:src="@drawable/ic_location_detail"
-        android:layout_marginStart="50dp"
-        android:layout_marginTop="10dp"/>
+        android:layout_marginStart="10dp"
+        android:layout_marginTop="18dp" />
+    <ImageView
+        android:id="@+id/imgPlaceBynear"
+        android:layout_width="35dp"
+        android:layout_height="50dp"
+        android:src="@drawable/ic_place_bynear"
+        android:layout_marginStart="10dp"
+        android:layout_marginTop="10dp"
+        android:layout_below="@+id/imgShowDetail"/>
 
     <android.support.design.widget.FloatingActionButton
         android:id="@+id/btnActionFloat"
@@ -121,4 +128,12 @@
              />
     </RelativeLayout>
 
+    <com.tuyenmonkey.mkloader.MKLoader
+        android:id="@+id/loading"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:mk_type="FishSpinner"
+        app:mk_color="@color/colorBackground"
+        android:layout_centerInParent="true"
+        android:visibility="gone"/>
 </RelativeLayout>

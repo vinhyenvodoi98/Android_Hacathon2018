@@ -3,6 +3,8 @@ package com.example.hanh.ava_android.model;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 
+import org.json.JSONObject;
+
 public class EndLocation {
 
     @SerializedName("lat")
@@ -17,6 +19,10 @@ public class EndLocation {
         this.lng = lng;
     }
 
+    public EndLocation(JSONObject jsonObject) {
+        lat = jsonObject.optDouble("lat");
+        lng = jsonObject.optDouble("lng");
+    }
     public Double getLat() {
         return lat;
     }

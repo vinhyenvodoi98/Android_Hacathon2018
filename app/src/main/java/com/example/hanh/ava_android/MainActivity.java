@@ -2,6 +2,7 @@ package com.example.hanh.ava_android;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Address;
@@ -35,13 +36,19 @@ import android.widget.Toast;
 import com.example.hanh.ava_android.BuildConfig;
 
 import com.example.hanh.ava_android.adapter.PlaceAutocompleteAdapter;
+import com.example.hanh.ava_android.androidbase.BaseActivity;
+import com.example.hanh.ava_android.model.AnswerInsrtuct;
 import com.example.hanh.ava_android.model.EndLocation;
+import com.example.hanh.ava_android.model.Instruct;
 import com.example.hanh.ava_android.model.Local;
 import com.example.hanh.ava_android.model.PlaceInfo;
 import com.example.hanh.ava_android.model.StartLocation;
+import com.example.hanh.ava_android.model.Step;
 import com.example.hanh.ava_android.remote.ApiUtils;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
+import com.google.android.gms.common.GooglePlayServicesNotAvailableException;
+import com.google.android.gms.common.GooglePlayServicesRepairableException;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.PendingResult;
 import com.google.android.gms.common.api.ResultCallback;
@@ -49,6 +56,7 @@ import com.google.android.gms.location.places.AutocompletePrediction;
 import com.google.android.gms.location.places.Place;
 import com.google.android.gms.location.places.PlaceBuffer;
 import com.google.android.gms.location.places.Places;
+import com.google.android.gms.location.places.ui.PlacePicker;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapFragment;
@@ -59,7 +67,9 @@ import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
+import com.tuyenmonkey.mkloader.MKLoader;
 
+import org.json.JSONObject;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -85,6 +95,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private static final int LOCATION_UPDATE_MIN_TIME = 5000;
     private static final int LOCATION_UPDATE_MIN_DISTANCE = 10;
     private static final float DEFAULT_ZOOM = 15f;
+    private static final int PLACE_PICKER_REQUEST = 1;
     private static final LatLngBounds LAT_LNG_BOUNDS = new LatLngBounds(new LatLng(-40, -168), new LatLng(71, 136));
     private MapFragment mapFragment;
     private Location location = null;
@@ -96,6 +107,16 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private GoogleApiClient googleApiClient;
     private Marker marker;
     private PlaceInfo placeInfo;
+    private Instruct instruct;
+    private List<Step> stepList;
+    private  Step step;
+    private Double startLat;
+    private Double startLng;
+    private Double endLat;
+    private Double endLng;
+    private MKLoader loader;
+    private PlacePicker placePicker;
+
 
 
     private List<Address> list = new ArrayList<>();
@@ -109,6 +130,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     ImageView imgClear;
     private ViewGroup layoutDirection;
     private ImageView imgDetail;
+    private ImageView imgNear;
 
     private LocationListener locationListener = new LocationListener() {
         @SuppressLint("DefaultLocale")
@@ -155,7 +177,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         layoutDirection = (ViewGroup) findViewById(R.id.layoutDirection);
         imgDetail = (ImageView) findViewById(R.id.imgShowDetail);
         layoutDirection.setVisibility(View.GONE);
-        imgDetail.setVisibility(View.GONE);
+        loader = (MKLoader) findViewById(R.id.loading);
+        imgNear = (ImageView) findViewById(R.id.imgPlaceBynear);
         //local = new Local();
 
         imgClear.setOnClickListener(new View.OnClickListener() {
@@ -230,6 +253,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 LAT_LNG_BOUNDS, null);
 
         edtDestination.setAdapter(placeAutocompleteAdapter);
+
         edtDestination.setOnEditorActionListener(new TextView.OnEditorActionListener() {
             @Override
             public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
@@ -244,13 +268,56 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             }
         });
 
+        imgDetail.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Log.d(TAG, " Click show InformationDetail");
+                try {
+                    if (marker.isInfoWindowShown()) {
+                        marker.hideInfoWindow();
+                    } else {
+                        Log.d(TAG, "Click. Place info: " + address.toString());
+                        marker.showInfoWindow();
+                    }
+                } catch (NullPointerException e) {
+                    Log.e(TAG, "onClick: NullPoiterExeption + " + e.getMessage());
+                }
+            }
+        });
+
+        imgNear.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                PlacePicker.IntentBuilder builder = new PlacePicker.IntentBuilder();
+
+                try {
+                    startActivityForResult(builder.build(MainActivity.this), PLACE_PICKER_REQUEST);
+                } catch (GooglePlayServicesRepairableException e) {
+                    Log.e(TAG, "GooglePlayServicesRepairableException: " + e.getMessage());
+                } catch (GooglePlayServicesNotAvailableException e) {
+                    Log.e(TAG, "GooglePlayServicesNotAvailableException: " + e.getMessage() );
+                }
+
+            }
+        });
 
 
-        hideSoftKeyboard();
+        BaseActivity.hideSoftKeyboard(this);
+    }
+
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == PLACE_PICKER_REQUEST) {
+            if (resultCode == RESULT_OK) {
+                Place place = PlacePicker.getPlace(this, data);
+
+                PendingResult<PlaceBuffer> placeResult = Places.GeoDataApi.getPlaceById(googleApiClient, place.getId());
+                placeResult.setResultCallback(updatePlaceCallback);
+            }
+        }
     }
 
     private void geoLocate() {
-        hideSoftKeyboard();
+        BaseActivity.hideSoftKeyboard(this);
         Log.d(TAG, "geoLoacte: geoLocating");
 
         String searchString = edtDestination.getText().toString();
@@ -272,22 +339,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             moveCamera(new LatLng(address.getLatitude(), address.getLongitude()), DEFAULT_ZOOM,
                     address.getAddressLine(0));
             imgDetail.setVisibility(View.VISIBLE);
-            imgDetail.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    Log.d(TAG, " Click show InformationDetail");
-                    try {
-                        if (marker.isInfoWindowShown()) {
-                            marker.hideInfoWindow();
-                        } else {
-                            Log.d(TAG, "Click. Place info: " + address.toString());
-                            marker.showInfoWindow();
-                        }
-                    } catch (NullPointerException e) {
-                        Log.e(TAG, "onClick: NullPoiterExeption + " + e.getMessage());
-                    }
-                }
-            });
+
 
 
             if (location == null) {
@@ -302,7 +354,26 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                         LatLng end = new LatLng(address.getLatitude(), address.getLongitude());
                         Log.i(TAG, "start: " + location.getLatitude() + location.getLongitude());
                         Log.i(TAG, "end : " + address.getLatitude() + address.getLongitude());
-                        route(start, end);
+
+                        startLocation = new StartLocation(location.getLatitude(), location.getLongitude());
+                        endLocation = new EndLocation(address.getLatitude(), address.getLongitude());
+
+                        drawLine(start, end);
+//                        Map<String, Map> coorDinate = new HashMap<>();
+//                        Map<String, ArrayList> localMap = new HashMap<>();
+//
+//                        ArrayList<StartLocation> startLocations = new ArrayList<>();
+//                        startLocations.add(startLocation);
+//                        localMap.put("start_location", startLocations);
+//
+//                        ArrayList<EndLocation> endLocations = new ArrayList<>();
+//                        endLocations.add(endLocation);
+//                        localMap.put("end_location", endLocations);
+//
+//                        coorDinate.put("Local", localMap);
+//                        callApiLocation(coorDinate);
+//                        drawLine(start, end);
+                        //route(start, end);
                     }
                 });
 
@@ -312,65 +383,97 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     }
 
-    protected void route(final LatLng sourcePosition, LatLng destPosition) {
-        Handler handler = new Handler() {
-            @Override
-            public void handleMessage(Message msg) {
-                super.handleMessage(msg);
-                try {
-                    Document doc = (Document) msg.obj;
-//                    GMapV2Direction md = new GMapV2Direction();
-                    ArrayList<LatLng> directionPoint =  getDirection(doc);
-                    PolylineOptions rectLine = new PolylineOptions().width(10).color(getResources()
-                            .getColor(R.color.colorDirection));
-                    for (int i = 0; i < directionPoint.size(); i++) {
-                        rectLine.add(directionPoint.get(i));
-                    }
-                    Polyline polylin = map.addPolyline(rectLine);
-                    getDurationText(doc);
-                    startLocation = new StartLocation(location.getLatitude(), location.getLongitude());
-                    endLocation = new EndLocation(address.getLatitude(), address.getLongitude());
-
-                    Map<String, Map> coorDinate = new HashMap<>();
-                    Map<String, ArrayList> localMap = new HashMap<>();
-
-                    ArrayList<StartLocation> startLocations = new ArrayList<>();
-                    startLocations.add(startLocation);
-                    localMap.put("start_location", startLocations);
-
-                    ArrayList<EndLocation> endLocations = new ArrayList<>();
-                    endLocations.add(endLocation);
-                    localMap.put("end_location", endLocations);
-
-                    coorDinate.put("Local", localMap);
-                    callApiLocation(coorDinate);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-
-            }
-        };
-
-        new GMapV2Direction(handler, sourcePosition, destPosition).execute();
-    }
-
-
-    private void callApiLocation(Map coorDinate) {
-        ApiUtils.getMapService().createMap(CONTENT_TYPE, coorDinate)
-                .enqueue(new Callback<com.example.hanh.ava_android.model.Map>() {
+    private void drawLine(LatLng start, LatLng end) {
+        ApiUtils.getMapService().getWaypoint(start.latitude, start.longitude, end.latitude, end.longitude)
+                .enqueue(new Callback<AnswerInsrtuct>() {
                     @Override
-                    public void onResponse(Call<com.example.hanh.ava_android.model.Map> call, Response<com.example.hanh.ava_android.model.Map> response) {
-
-                        Log.i(TAG, "onResponse: " + response);
+                    public void onResponse(Call<AnswerInsrtuct> call, Response<AnswerInsrtuct> response) {
+                        AnswerInsrtuct answerInsrtuct = response.body();
+                        if(answerInsrtuct != null && answerInsrtuct.getInstruct() != null) {
+                            instruct = answerInsrtuct.getInstruct();
+                            getListStep(instruct);
+                        }
                     }
 
                     @Override
-                    public void onFailure(Call<com.example.hanh.ava_android.model.Map> call, Throwable t) {
-                        Log.e(TAG, "onFailure: " + t.getLocalizedMessage());
+                    public void onFailure(Call<AnswerInsrtuct> call, Throwable t) {
+                        Log.e(TAG, "onFailture: " + t.getMessage());
                     }
                 });
-
     }
+
+    private void getListStep(Instruct instruct) {
+        ArrayList<LatLng> listGeopoints = new ArrayList<LatLng>();
+        stepList = instruct.getStep();
+        step = new Step();
+        for (int i = 0; i < stepList.size() ; i++) {
+            step = stepList.get(i);
+            startLat = step.getStartLocation().getLat();
+            startLng = step.getStartLocation().getLng();
+            endLat = step.getEndLocation().getLat();
+            endLng = step.getEndLocation().getLng();
+            listGeopoints.add(new LatLng(startLat, startLng));
+            listGeopoints.add(new LatLng(endLat, endLng));
+        }
+        drawPoints(listGeopoints);
+    }
+
+
+    private void drawPoints(ArrayList<LatLng> listGeopoints) {
+        PolylineOptions rectLine = new PolylineOptions().width(10).color(getResources()
+                .getColor(R.color.colorDirection));
+        for (int i = 0; i < listGeopoints.size(); i++) {
+            rectLine.add(listGeopoints.get(i));
+        }
+        Polyline polylin = map.addPolyline(rectLine);
+    }
+
+//    protected void route(final LatLng sourcePosition, LatLng destPosition) {
+//        Handler handler = new Handler() {
+//            @Override
+//            public void handleMessage(Message msg) {
+//                super.handleMessage(msg);
+//                try {
+//                    Document doc = (Document) msg.obj;
+////                    GMapV2Direction md = new GMapV2Direction();
+//                    ArrayList<LatLng> directionPoint =  getDirection(doc);
+//                    PolylineOptions rectLine = new PolylineOptions().width(10).color(getResources()
+//                            .getColor(R.color.colorDirection));
+//                    for (int i = 0; i < directionPoint.size(); i++) {
+//                        rectLine.add(directionPoint.get(i));
+//                    }
+//                    Polyline polylin = map.addPolyline(rectLine);
+//                    getDurationText(doc);
+//
+//
+//
+//                } catch (Exception e) {
+//                    e.printStackTrace();
+//                }
+//
+//            }
+//        };
+//
+//        new GMapV2Direction(handler, sourcePosition, destPosition).execute();
+//    }
+
+//
+//    private void callApiLocation(Map coorDinate) {
+//        ApiUtils.getMapService().createMap(CONTENT_TYPE, coorDinate)
+//                .enqueue(new Callback<com.example.hanh.ava_android.model.Map>() {
+//                    @Override
+//                    public void onResponse(Call<com.example.hanh.ava_android.model.Map> call, Response<com.example.hanh.ava_android.model.Map> response) {
+//
+//                        Log.i(TAG, "onResponse: " + response);
+//                    }
+//
+//                    @Override
+//                    public void onFailure(Call<com.example.hanh.ava_android.model.Map> call, Throwable t) {
+//                        Log.e(TAG, "onFailure: " + t.getLocalizedMessage());
+//                    }
+//                });
+//
+//    }
 
 
     private void initMap() {
@@ -450,14 +553,15 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     private void moveCamera(LatLng latLng, float zoom, String title) {
+        map.clear();
         Log.d(TAG, "moveCamera: moving camera to: lat: " + latLng.latitude + ", lng: " + latLng.longitude);
         map.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, zoom));
 
         MarkerOptions options = new MarkerOptions()
                 .position(latLng)
                 .title(title);
-        map.addMarker(options);
-        hideSoftKeyboard();
+        marker = map.addMarker(options);
+        BaseActivity.hideSoftKeyboard(this);
     }
 
 
@@ -482,208 +586,14 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             map.addMarker(new MarkerOptions().position(latLng));
         }
 
-        hideSoftKeyboard();
+        layoutDirection.setVisibility(View.VISIBLE);
+       BaseActivity.hideSoftKeyboard(this);
     }
 
-    private void hideSoftKeyboard() {
-        this.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
-    }
 
     //get GMapV2Direction
 
-    public ArrayList<LatLng> getDirection(Document doc) {
-        NodeList nl1, nl2, nl3;
-        ArrayList<LatLng> listGeopoints = new ArrayList<LatLng>();
-        nl1 = doc.getElementsByTagName("step");
-        if (nl1.getLength() > 0) {
-            for (int i = 0; i < nl1.getLength(); i++) {
-                Node node1 = nl1.item(i);
-                nl2 = node1.getChildNodes();
 
-                Node locationNode = nl2
-                        .item(getNodeIndex(nl2, "start_location"));
-                nl3 = locationNode.getChildNodes();
-                Node latNode = nl3.item(getNodeIndex(nl3, "lat"));
-                double lat = Double.parseDouble(latNode.getTextContent());
-                Node lngNode = nl3.item(getNodeIndex(nl3, "lng"));
-                double lng = Double.parseDouble(lngNode.getTextContent());
-                listGeopoints.add(new LatLng(lat, lng));
-
-                locationNode = nl2.item(getNodeIndex(nl2, "polyline"));
-                nl3 = locationNode.getChildNodes();
-                latNode = nl3.item(getNodeIndex(nl3, "points"));
-                ArrayList<LatLng> arr = decodePoly(latNode.getTextContent());
-                for (int j = 0; j < arr.size(); j++) {
-                    listGeopoints.add(new LatLng(arr.get(j).latitude, arr
-                            .get(j).longitude));
-                }
-
-                locationNode = nl2.item(getNodeIndex(nl2, "end_location"));
-                nl3 = locationNode.getChildNodes();
-                latNode = nl3.item(getNodeIndex(nl3, "lat"));
-                lat = Double.parseDouble(latNode.getTextContent());
-                lngNode = nl3.item(getNodeIndex(nl3, "lng"));
-                lng = Double.parseDouble(lngNode.getTextContent());
-                listGeopoints.add(new LatLng(lat, lng));
-            }
-        }
-
-        return listGeopoints;
-    }
-
-    private ArrayList<LatLng> decodePoly(String encoded) {
-        ArrayList<LatLng> poly = new ArrayList<LatLng>();
-        int index = 0, len = encoded.length();
-        int lat = 0, lng = 0;
-        while (index < len) {
-            int b, shift = 0, result = 0;
-            do {
-                b = encoded.charAt(index++) - 63;
-                result |= (b & 0x1f) << shift;
-                shift += 5;
-            } while (b >= 0x20);
-            int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
-            lat += dlat;
-            shift = 0;
-            result = 0;
-            do {
-                b = encoded.charAt(index++) - 63;
-                result |= (b & 0x1f) << shift;
-                shift += 5;
-            } while (b >= 0x20);
-            int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
-            lng += dlng;
-
-            LatLng position = new LatLng((double) lat / 1E5, (double) lng / 1E5);
-            poly.add(position);
-        }
-        return poly;
-    }
-
-    public String getDurationText(Document doc) {
-        try {
-
-            NodeList nl1 = doc.getElementsByTagName("duration");
-            Node node1 = nl1.item(0);
-            NodeList nl2 = node1.getChildNodes();
-            Node node2 = nl2.item(getNodeIndex(nl2, "text"));
-            Log.i("DurationText", node2.getTextContent());
-            return node2.getTextContent();
-        } catch (Exception e) {
-            return "0";
-        }
-    }
-
-    public int getDurationValue(Document doc) {
-        try {
-            NodeList nl1 = doc.getElementsByTagName("duration");
-            Node node1 = nl1.item(0);
-            NodeList nl2 = node1.getChildNodes();
-            Node node2 = nl2.item(getNodeIndex(nl2, "value"));
-            Log.i("DurationValue", node2.getTextContent());
-            return Integer.parseInt(node2.getTextContent());
-        } catch (Exception e) {
-            return -1;
-        }
-    }
-
-    private int getNodeIndex(NodeList nl, String nodename) {
-        for (int i = 0; i < nl.getLength(); i++) {
-            if (nl.item(i).getNodeName().equals(nodename))
-                return i;
-        }
-        return -1;
-    }
-
-    public String getDistanceText(Document doc) {
-        /*
-         * while (en.hasMoreElements()) { type type = (type) en.nextElement();
-         *
-         * }
-         */
-
-        try {
-            NodeList nl1;
-            nl1 = doc.getElementsByTagName("distance");
-
-            Node node1 = nl1.item(nl1.getLength() - 1);
-            NodeList nl2 = null;
-            nl2 = node1.getChildNodes();
-            Node node2 = nl2.item(getNodeIndex(nl2, "value"));
-            Log.d("DistanceText", node2.getTextContent());
-            return node2.getTextContent();
-        } catch (Exception e) {
-            return "-1";
-        }
-
-        /*
-         * NodeList nl1; if(doc.getElementsByTagName("distance")!=null){ nl1=
-         * doc.getElementsByTagName("distance");
-         *
-         * Node node1 = nl1.item(nl1.getLength() - 1); NodeList nl2 = null; if
-         * (node1.getChildNodes() != null) { nl2 = node1.getChildNodes(); Node
-         * node2 = nl2.item(getNodeIndex(nl2, "value")); Log.d("DistanceText",
-         * node2.getTextContent()); return node2.getTextContent(); } else return
-         * "-1";} else return "-1";
-         */
-    }
-
-    public int getDistanceValue(Document doc) {
-        try {
-            NodeList nl1 = doc.getElementsByTagName("distance");
-            Node node1 = null;
-            node1 = nl1.item(nl1.getLength() - 1);
-            NodeList nl2 = node1.getChildNodes();
-            Node node2 = nl2.item(getNodeIndex(nl2, "value"));
-            Log.i("DistanceValue", node2.getTextContent());
-            return Integer.parseInt(node2.getTextContent());
-        } catch (Exception e) {
-            return -1;
-        }
-        /*
-         * NodeList nl1 = doc.getElementsByTagName("distance"); Node node1 =
-         * null; if (nl1.getLength() > 0) node1 = nl1.item(nl1.getLength() - 1);
-         * if (node1 != null) { NodeList nl2 = node1.getChildNodes(); Node node2
-         * = nl2.item(getNodeIndex(nl2, "value")); Log.i("DistanceValue",
-         * node2.getTextContent()); return
-         * Integer.parseInt(node2.getTextContent()); } else return 0;
-         */
-    }
-
-    public String getStartAddress(Document doc) {
-        try {
-            NodeList nl1 = doc.getElementsByTagName("start_address");
-            Node node1 = nl1.item(0);
-            Log.i("StartAddress", node1.getTextContent());
-            return node1.getTextContent();
-        } catch (Exception e) {
-            return "-1";
-        }
-
-    }
-
-    public String getEndAddress(Document doc) {
-        try {
-            NodeList nl1 = doc.getElementsByTagName("end_address");
-            Node node1 = nl1.item(0);
-            Log.i("StartAddress", node1.getTextContent());
-            return node1.getTextContent();
-        } catch (Exception e) {
-            return "-1";
-        }
-    }
-
-    public String getCopyRights(Document doc) {
-        try {
-            NodeList nl1 = doc.getElementsByTagName("copyrights");
-            Node node1 = nl1.item(0);
-            Log.i("CopyRights", node1.getTextContent());
-            return node1.getTextContent();
-        } catch (Exception e) {
-            return "-1";
-        }
-
-    }
 
 
     @Override
@@ -696,7 +606,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         @Override
         public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-            hideSoftKeyboard();
+            BaseActivity.hideSoftKeyboard(getParent());
 
             final AutocompletePrediction item = placeAutocompleteAdapter.getItem(position);
             final String placeId = item.getPlaceId();
@@ -734,6 +644,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
             moveCamera(new LatLng(place.getViewport().getCenter().latitude, place.getViewport()
                     .getCenter().longitude), DEFAULT_ZOOM, placeInfo);
+
 
             places.release();
         }

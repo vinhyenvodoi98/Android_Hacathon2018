@@ -67,6 +67,8 @@ dependencies {
         transitive = true
     }
 
+    implementation 'com.tuyenmonkey:mkloader:1.4.0'
+
     // optional branch io
     implementation 'com.android.support:customtabs:27.1.1' // Chrome Tab matching
     implementation 'com.google.android.gms:play-services-ads:15.0.1' // GAID matching

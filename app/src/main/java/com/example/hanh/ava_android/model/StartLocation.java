@@ -1,7 +1,10 @@
 package com.example.hanh.ava_android.model;
 
+import com.google.gson.JsonObject;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
+
+import org.json.JSONObject;
 
 public class StartLocation
 {
@@ -15,6 +18,11 @@ public class StartLocation
     public StartLocation(Double lat, Double lng) {
         this.lat = lat;
         this.lng = lng;
+    }
+
+    public StartLocation(JSONObject jsonObject) {
+        lat = jsonObject.optDouble("lat");
+        lng = jsonObject.optDouble("lng");
     }
 
     public Double getLat() {
